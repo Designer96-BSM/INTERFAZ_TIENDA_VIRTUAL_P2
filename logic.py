@@ -132,25 +132,41 @@ class WhatsAppManager:
             producto = item_data["producto"]
             cantidad = item_data["cantidad"]
             subtotal = producto["precio"] * cantidad
-            items_texto += f"\n• {producto['nombre']} x{cantidad} = ${subtotal:.2f}"
+            items_texto += f"\n{producto['emoji']} {producto['nombre']} x{cantidad} = ${subtotal:.2f}"
 
-        mensaje = f"""
-Hola 👋, quiero hacer un pedido en MiCelio 🍄
+        mensaje = f"""Hola 👋, quiero hacer un pedido en FungiHouse 🍄
 
-*Resumen del Pedido:*
-{items_texto}
+*Resumen del Pedido:*{items_texto}
 
 *Total: ${total:.2f}*
 
-¿Cuál es el proceso de pago?
-"""
+¿Cuál es el proceso de pago?"""
+
         return mensaje
 
     @staticmethod
     def obtener_url_whatsapp(numero_whatsapp, mensaje):
         """Obtiene URL de WhatsApp para enviar mensaje"""
-        # Codificar mensaje para URL
-        mensaje_codificado = urllib.parse.quote(mensaje)
-        # Retornar URL de WhatsApp (sin el +)
+        import urllib.parse
+
         numero_limpio = numero_whatsapp.replace("+", "")
+
+        # Codificar correctamente
+        mensaje_codificado = urllib.parse.quote(mensaje)
+
         return f"https://wa.me/{numero_limpio}?text={mensaje_codificado}"
+
+    @staticmethod
+    def enviar_mensaje_pywhatkit(numero_whatsapp, mensaje):
+        """Envía mensaje usando pywhatkit (alternativa)"""
+        import pywhatkit as kit
+        import time
+
+        try:
+            numero_limpio = numero_whatsapp.replace("+", "")
+            # Envía el mensaje inmediatamente
+            kit.sendwhatmsg_instantly(f"+{numero_limpio}", mensaje)
+            return True
+        except Exception as e:
+            print(f"Error con pywhatkit: {e}")
+            return False

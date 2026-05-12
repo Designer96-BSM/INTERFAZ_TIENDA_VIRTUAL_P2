@@ -294,8 +294,8 @@ class InicioView:
                         content=ft.Image(
                             src=gif_path,
                             fit="cover",
-                            height=600,
-                            width=1300,
+                            height=470,
+                            width=1100,
                         ),
                         alignment=ft.alignment.center,
                     ),
@@ -445,7 +445,7 @@ class InicioView:
                 ], alignment=ft.MainAxisAlignment.CENTER, spacing=10, wrap=True),
                 ft.Divider(height=15, color=BORDER_COLOR),
                 ft.Text(
-                    "© 2025 MiCelio - Todos los derechos reservados",
+                    "© 2025 FungiHouse - Todos los derechos reservados",
                     size=10,
                     color=TEXT_SECONDARY,
                     text_align="center",

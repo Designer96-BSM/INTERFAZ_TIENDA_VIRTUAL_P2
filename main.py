@@ -13,10 +13,10 @@ from views import (
 )
 
 
-class MicelioApp:
+class FungiHouseApp:
     def __init__(self, page: ft.Page):
         self.page = page
-        self.page.title = "MiCelio - Hongos Premium"
+        self.page.title = "FungiHouse - Sabores Ancestrales"
         self.page.window.maximized = True
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.on_resized = self.on_resized
@@ -310,7 +310,7 @@ class MicelioApp:
         self.ir_carrito(None)
 
     def enviar_whatsapp(self, e):
-        """Envía el pedido por WhatsApp - Simple y garantizado"""
+        """Envía el pedido por WhatsApp - Híbrido con 3 planes"""
         try:
             total = self.carrito_manager.obtener_total()
 
@@ -335,36 +335,68 @@ class MicelioApp:
             import time
 
             sistema = platform.system()
+            app_abierta = False
 
-            # PLAN A: Intenta abrir la app nativa
+            print(f"[DEBUG] Sistema: {sistema}")
+            print(f"[DEBUG] Intentando abrir WhatsApp...")
+
+            # PLAN A: Intenta con pywhatkit
             try:
-                if sistema == "Windows":
-                    subprocess.Popen(f'start {url_app}', shell=True)
-                elif sistema == "Darwin":
-                    subprocess.Popen(['open', url_app])
-                elif sistema == "Linux":
-                    subprocess.Popen(['xdg-open', url_app])
-            except:
-                pass  # Si falla, continúa
+                import pywhatkit as kit
+                print("[DEBUG] Intentando con pywhatkit...")
+                kit.sendwhatmsg_instantly(f"+{numero_limpio}", mensaje, wait_time=2)
+                app_abierta = True
+                print("[DEBUG] ✅ pywhatkit funcionó")
+            except Exception as error_pywhatkit:
+                print(f"[DEBUG] pywhatkit falló: {error_pywhatkit}")
+                app_abierta = False
 
-            # PLAN B: Siempre abre WhatsApp Web también (garantizado)
-            time.sleep(1)  # Pequeña pausa
-            webbrowser.open(url_whatsapp)
+            # PLAN B: Si pywhatkit falla, intenta app nativa
+            if not app_abierta:
+                try:
+                    print("[DEBUG] Intentando con app nativa...")
+                    if sistema == "Windows":
+                        subprocess.Popen(f'start {url_app}', shell=True)
+                        app_abierta = True
+                        print("[DEBUG] ✅ App nativa abierta (Windows)")
+                    elif sistema == "Darwin":
+                        subprocess.Popen(['open', url_app])
+                        app_abierta = True
+                        print("[DEBUG] ✅ App nativa abierta (macOS)")
+                    elif sistema == "Linux":
+                        subprocess.Popen(['xdg-open', url_app])
+                        app_abierta = True
+                        print("[DEBUG] ✅ App nativa abierta (Linux)")
+                except Exception as error_app:
+                    print(f"[DEBUG] App nativa falló: {error_app}")
+                    app_abierta = False
 
-            self.mostrar_snackbar(
-                "✓ Abriendo WhatsApp (app o web)",
-                SUCCESS_COLOR
-            )
+            # PLAN C: Si todo falla, abre WhatsApp Web
+            if not app_abierta:
+                print("[DEBUG] Abriendo Plan C: WhatsApp Web")
+                webbrowser.open(url_whatsapp)
+                time.sleep(1)
+                self.mostrar_snackbar(
+                    "✓ Abriendo WhatsApp Web en el navegador",
+                    SUCCESS_COLOR
+                )
+            else:
+                self.mostrar_snackbar(
+                    "✓ Abriendo WhatsApp",
+                    SUCCESS_COLOR
+                )
 
             # Limpiar carrito
             self.carrito_manager.limpiar()
             self.actualizar_contador_carrito()
 
             # Volver a inicio
+            time.sleep(2)
             self.mostrar_inicio()
 
         except Exception as error:
-            self.mostrar_snackbar(f"Error: {str(error)}", SECONDARY_COLOR)
+            print(f"[DEBUG] Error general: {error}")
+            self.mostrar_snackbar(f"❌ Error: {str(error)}", SECONDARY_COLOR)
 
     def ir_instrucciones(self, e):
         """Va a instrucciones"""
@@ -427,10 +459,10 @@ class MicelioApp:
 
 
 def main(page: ft.Page):
-    app = MicelioApp(page)
+    app = FungiHouseApp(page)
 
 
 if __name__ == "__main__":
-    ft.app(target=main)
+    #ft.app(target=main)
     # Para ejecutar en web:
-    # ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8080)
+     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8000)
