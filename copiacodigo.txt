@@ -1,0 +1,1000 @@
+import flet as ft
+import webbrowser
+import os
+import json
+import re
+from datetime import datetime
+
+
+class MicelioApp:
+    def __init__(self, page: ft.Page):
+        self.page = page
+        self.page.title = "MiCelio - Hongos Premium"
+        self.page.window.maximized = True
+        self.page.theme_mode = ft.ThemeMode.DARK
+        self.page.on_resized = self.on_resized
+
+        self.carrito = {}  # Cambiar a diccionario: {id_producto: {producto, cantidad}}
+
+        self.productos = [
+            {
+                "id": 1,
+                "nombre": "Hongos Frescos Ostra",
+                "precio": 12.99,
+                "emoji": "🍄",
+                "descripcion": "Hongos ostra frescos de alta calidad",
+                "categoria": "Hongos Frescos"
+            },
+            {
+                "id": 2,
+                "nombre": "Hongos Shiitake",
+                "precio": 14.99,
+                "emoji": "🍄",
+                "descripcion": "Shiitake premium importado",
+                "categoria": "Hongos Frescos"
+            },
+            {
+                "id": 3,
+                "nombre": "Hongos Champiñones",
+                "precio": 8.99,
+                "emoji": "🍄",
+                "descripcion": "Champiñones frescos locales",
+                "categoria": "Hongos Frescos"
+            },
+            {
+                "id": 4,
+                "nombre": "Hongos Secos Porcini",
+                "precio": 18.99,
+                "emoji": "🌾",
+                "descripcion": "Porcini deshidratado premium",
+                "categoria": "Hongos Secos"
+            },
+            {
+                "id": 5,
+                "nombre": "Mix Hongos Secos",
+                "precio": 16.99,
+                "emoji": "🌾",
+                "descripcion": "Mezcla de hongos deshidratados",
+                "categoria": "Hongos Secos"
+            },
+            {
+                "id": 6,
+                "nombre": "Extracto de Reishi",
+                "precio": 24.99,
+                "emoji": "🧪",
+                "descripcion": "Extracto concentrado de Reishi",
+                "categoria": "Extractos"
+            },
+            {
+                "id": 7,
+                "nombre": "Extracto Lion's Mane",
+                "precio": 22.99,
+                "emoji": "🧪",
+                "descripcion": "Extracto de melena de león",
+                "categoria": "Extractos"
+            },
+            {
+                "id": 8,
+                "nombre": "Kit Cultivo Ostra",
+                "precio": 29.99,
+                "emoji": "🌱",
+                "descripcion": "Kit completo para cultivar hongos ostra",
+                "categoria": "Kits de Cultivo"
+            },
+            {
+                "id": 9,
+                "nombre": "Kit Cultivo Shiitake",
+                "precio": 34.99,
+                "emoji": "🌱",
+                "descripcion": "Kit profesional para shiitake",
+                "categoria": "Kits de Cultivo"
+            },
+        ]
+
+        self.cargar_carrito()
+        self.setup_ui()
+
+    def obtener_ruta_logo(self):
+        """Obtiene la ruta correcta del logo"""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_path = os.path.join(script_dir, "images", "logo.png")
+        return logo_path
+
+    def obtener_ruta_titulo(self):
+        """Obtiene la ruta correcta del texto del título como imagen"""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Asegúrate de tener la imagen 'titulo.png' en la carpeta images
+        titulo_path = os.path.join(script_dir, "images", "titulo.png")
+        return titulo_path
+
+    def setup_ui(self):
+        """Configura la interfaz principal"""
+
+        # Crear botones de navegación
+        nav_buttons = ft.Row([
+            ft.TextButton(
+                "Inicio",
+                style=ft.ButtonStyle(
+                    color="gray",
+
+                ),
+                on_click=self.ir_inicio,
+            ),
+            ft.TextButton(
+                "Tienda",
+                style=ft.ButtonStyle(
+                    color="gray",
+
+                ),
+                on_click=self.ir_tienda,
+            ),
+            ft.TextButton(
+                "Instrucciones",
+                style=ft.ButtonStyle(
+                    color="gray",
+
+                ),
+                on_click=self.ir_instrucciones,
+            ),
+            ft.TextButton(
+                "Blog",
+                style=ft.ButtonStyle(
+                    color="gray",
+
+                ),
+                on_click=self.ir_blog,
+            ),
+        ], spacing=110,scale=1.2)
+
+        # Obtener rutas del logo y del título (imagen)
+        logo_path = self.obtener_ruta_logo()
+        titulo_path = self.obtener_ruta_titulo()  # Llama al nuevo método
+
+        logo_existe = os.path.exists(logo_path)
+        titulo_existe = os.path.exists(titulo_path)
+
+        # Crear logo
+        if logo_existe:
+            logo = ft.Image(
+                src=logo_path,
+                width=50,  # Ajusta el tamaño según tu imagen
+                height=50,
+                fit="contain",
+            )
+        else:
+            logo = ft.Text("🍄", size=32)
+
+        # Crear título (Imagen o Texto de respaldo)
+        if titulo_existe:
+            titulo_img = ft.Image(
+                src=titulo_path,
+                height=50,  # Ajusta la altura según tu imagen de texto
+                fit="contain",
+            )
+        else:
+            # Fallback si no hay imagen de título
+            titulo_img = ft.Text("FungiHouse", weight="bold", size=22, color="#FF8C00")
+
+        # Badge para el contador del carrito
+        self.carrito_badge = ft.Container(
+            content=ft.Text(
+                "",
+                size=12,
+                weight="bold",
+                color="white",
+                text_align="center",
+            ),
+            width=22,
+            height=22,
+            bgcolor="#FF6B6B",
+            border_radius=12,
+            alignment=ft.alignment.center,
+        )
+
+        self.page.appbar = ft.AppBar(
+            title=ft.Row([
+                logo,
+                titulo_img,  # <--- Aquí va la imagen del título o el texto de respaldo
+                ft.Container(expand=True),
+                nav_buttons,
+                ft.Container(expand=True),
+            ], spacing=2, expand=True),
+            bgcolor="black",
+            elevation=0,
+            actions=[
+                ft.Stack([
+                    ft.IconButton(
+                        ft.Icons.SHOPPING_CART,
+                        icon_color="#FF8C00",
+                        on_click=self.ir_carrito,
+                    ),
+                    self.carrito_badge,
+                ], alignment=ft.alignment.top_right),
+                ft.IconButton(
+                    ft.Icons.ACCOUNT_CIRCLE,
+                    icon_color="#FF8C00",
+                ),
+            ]
+        )
+
+        self.main_content = ft.Column(
+            expand=True,
+            scroll="auto",
+        )
+
+        self.mostrar_inicio()
+
+        self.page.add(
+            ft.Container(
+                content=self.main_content,
+                expand=True,
+                bgcolor="#0d0d0d"
+            )
+        )
+
+    def obtener_ruta_gif(self):
+        """Obtiene la ruta correcta del GIF"""
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        gif_path = os.path.join(script_dir, "videos", "intro.gif")
+        return gif_path
+
+    def mostrar_inicio(self):
+        """Pantalla principal"""
+        self.main_content.controls.clear()
+
+        gif_path = self.obtener_ruta_gif()
+        gif_existe = os.path.exists(gif_path)
+
+        if gif_existe:
+            hero = ft.Container(
+                content=ft.Column([
+                    ft.Container(
+                        content=ft.Image(
+                            src=gif_path,
+                            fit="cover",
+                            height=600,
+                            width=1300,
+                        ),
+                        alignment=ft.alignment.center,
+                    ),
+                    ft.Container(
+                        content=ft.ElevatedButton(
+                            "Explorar Tienda",
+                            width=220,
+                            height=50,
+                            bgcolor="#FF8C00",
+                            color="white",
+                            on_click=self.ir_tienda,
+                        ),
+                        padding=20,
+                        alignment=ft.alignment.center,
+                        expand=True,
+                    ),
+                ], spacing=0, expand=True),
+                expand=True,
+                padding=0,
+                alignment=ft.alignment.center,
+                border_radius=0,
+                bgcolor="black",
+            )
+        else:
+            hero = ft.Container(
+                content=ft.Column([
+
+                    ft.Text("🍄", size=100),
+                    ft.Container(height=40),
+                    ft.ElevatedButton(
+                        "Explorar Tienda",
+                        width=220,
+                        height=50,
+                        bgcolor="black",
+                        color="white",
+                        on_click=self.ir_tienda,
+                    ),
+                    ft.Container(height=80),
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+                height=350,
+                padding=0,
+                border_radius=0,
+                bgcolor="black",
+            )
+
+        beneficios_titulo = ft.Container(
+            content=ft.Text("¿POR QUÉ ELEGIRNOS?", size=14, weight="bold", color="#FF8C00"),
+            padding=ft.padding.symmetric(horizontal=20, vertical=20),
+            bgcolor="black",
+        )
+
+        beneficios = [
+            {"titulo": "100% Orgánico", "descripcion": "Cultivado sin químicos", "icon": "🌿"},
+            {"titulo": "Entrega Rápida", "descripcion": "En 24-48 horas", "icon": "🚚"},
+            {"titulo": "Garantía", "descripcion": "Satisfacción garantizada", "icon": "✅"},
+            {"titulo": "Expertos", "descripcion": "Soporte especializado", "icon": "👨‍🔬"},
+        ]
+
+        columna_izq = ft.Column(expand=True, spacing=12)
+        columna_der = ft.Column(expand=True, spacing=12)
+
+        for idx, beneficio in enumerate(beneficios):
+            card = ft.Container(
+                content=ft.Row([
+                    ft.Text(beneficio["icon"], size=35),
+                    ft.Column([
+                        ft.Text(beneficio["titulo"], size=12, weight="bold", color="#FF8C00"),
+                        ft.Text(beneficio["descripcion"], size=10, color="#999999"),
+                    ], spacing=2, expand=True),
+                ], spacing=15),
+                padding=15,
+                bgcolor="#121212",
+                border_radius=10,
+                border=ft.border.all(2, "gray"),
+                margin=ft.margin.symmetric(horizontal=10),
+            )
+
+            if idx % 2 == 0:
+                columna_izq.controls.append(card)
+            else:
+                columna_der.controls.append(card)
+
+        beneficios_row = ft.Row([
+            columna_izq,
+            columna_der,
+        ], expand=True, spacing=10)
+
+        beneficios_container = ft.Container(
+            content=beneficios_row,
+            padding=ft.padding.symmetric(horizontal=15, vertical=10),
+            bgcolor="#121212",
+        )
+
+        testimonios_titulo = ft.Container(
+            content=ft.Text("TESTIMONIOS", size=14, weight="bold", color="#FF8C00"),
+            padding=ft.padding.symmetric(horizontal=20, vertical=20),
+            bgcolor="#0d0d0d",
+        )
+
+        testimonios = [
+            {
+                "texto": "Los mejores hongos que he probado. La calidad es increíble.",
+                "autor": "María García",
+                "rating": "⭐⭐⭐⭐⭐"
+            },
+            {
+                "texto": "Envío rápido y productos frescos. Muy recomendado.",
+                "autor": "Juan Pérez",
+                "rating": "⭐⭐⭐⭐⭐"
+            },
+        ]
+
+        testimonios_column = ft.Column()
+        for testimonio in testimonios:
+            card = ft.Container(
+                content=ft.Column([
+                    ft.Text(testimonio["rating"], size=12),
+                    ft.Text(f'"{testimonio["texto"]}"', size=11, color="#CCCCCC", italic=True),
+                    ft.Container(height=8),
+                    ft.Text(testimonio["autor"], size=10, weight="bold", color="#FF8C00"),
+                ], spacing=3),
+                padding=15,
+                bgcolor="#1a1a1a",
+                border_radius=10,
+                border=ft.border.all(1, "#FF8C00"),
+                margin=ft.margin.symmetric(horizontal=15, vertical=8),
+            )
+            testimonios_column.controls.append(card)
+
+        self.newsletter_email = ft.TextField(
+            label="Tu correo",
+            bgcolor="#2a2a2a",
+            border_color="#FF8C00",
+            color="white",
+            label_style=ft.TextStyle(color="#999999"),
+            expand=True,
+        )
+
+        newsletter = ft.Container(
+            content=ft.Column([
+                ft.Text("Suscríbete a Nuestro Newsletter", size=16, weight="bold", color="#FF8C00"),
+                ft.Text("Recibe ofertas exclusivas y consejos", size=12, color="#999999"),
+                ft.Container(height=15),
+                self.newsletter_email,
+                ft.Container(height=10),
+                ft.ElevatedButton(
+                    "Suscribirse",
+                    expand=True,
+                    height=40,
+                    bgcolor="#FF8C00",
+                    color="white",
+                    on_click=self.suscribirse_newsletter,
+                ),
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
+            padding=30,
+            bgcolor="#1a1a1a",
+            border_radius=0,
+            border=ft.border.all(1, "#FF8C00"),
+        )
+
+        footer = ft.Container(
+            content=ft.Column([
+                ft.Row([
+                    ft.TextButton("Facebook", style=ft.ButtonStyle(color="#FF8C00")),
+                    ft.TextButton("Instagram", style=ft.ButtonStyle(color="#FF8C00")),
+                    ft.TextButton("Twitter", style=ft.ButtonStyle(color="#FF8C00")),
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=10, wrap=True),
+                ft.Divider(height=15, color="#333333"),
+                ft.Text(
+                    "© 2025 MiCelio - Todos los derechos reservados",
+                    size=10,
+                    color="#666666",
+                    text_align="center",
+                ),
+                ft.Container(height=15),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
+            padding=20,
+            bgcolor="#1a1a1a",
+        )
+
+        self.main_content.controls = [
+            hero,
+            beneficios_titulo,
+            beneficios_container,
+            ft.Container(height=20, bgcolor="#121212"),
+            testimonios_titulo,
+            testimonios_column,
+            ft.Container(height=20, bgcolor="#121212"),
+            newsletter,
+            footer,
+        ]
+        self.page.update()
+
+    def ir_inicio(self, e):
+        """Va a inicio"""
+        self.mostrar_inicio()
+
+    def ir_tienda(self, e):
+        """Va a tienda con productos"""
+        self.main_content.controls.clear()
+
+        self.search_field = ft.TextField(
+            label="Buscar productos...",
+            prefix_icon=ft.Icons.SEARCH,
+            bgcolor="#2a2a2a",
+            border_color="#FF8C00",
+            color="white",
+            label_style=ft.TextStyle(color="#999999"),
+            on_change=self.filtrar_productos,
+        )
+
+        categorias = list(set(p["categoria"] for p in self.productos))
+        self.filtro_categoria = ft.Dropdown(
+            label="Categoría",
+            options=[ft.dropdown.Option("Todas")] +
+                    [ft.dropdown.Option(cat) for cat in categorias],
+            bgcolor="#2a2a2a",
+            border_color="#FF8C00",
+            color="white",
+            label_style=ft.TextStyle(color="#999999"),
+            on_change=self.filtrar_productos,
+            value="Todas",
+        )
+
+        header = ft.Container(
+            content=ft.Column([
+                ft.Text("Tienda", size=24, weight="bold", color="#FF8C00"),
+                ft.Text("Nuestros productos premium", size=12, color="#999999"),
+                ft.Container(height=15),
+                ft.Row([
+                    self.search_field,
+                    self.filtro_categoria,
+                ], spacing=10),
+            ]),
+            padding=15,
+            bgcolor="#1a1a1a",
+        )
+
+        ancho = self.page.window.width
+        if ancho < 600:
+            runs_count = 2
+        elif ancho < 1200:
+            runs_count = 3
+        else:
+            runs_count = 4
+
+        self.productos_grid = ft.GridView(
+            runs_count=runs_count,
+            spacing=12,
+            run_spacing=12,
+            child_aspect_ratio=0.75,
+            padding=ft.padding.symmetric(horizontal=15),
+            expand=True,
+        )
+
+        self.actualizar_grid()
+
+        self.main_content.controls = [
+            header,
+            ft.Divider(height=1, color="#333333"),
+            self.productos_grid,
+            ft.Container(height=20, bgcolor="#0d0d0d"),
+        ]
+        self.page.update()
+
+    def filtrar_productos(self, e):
+        """Filtra productos según búsqueda y categoría"""
+        texto = self.search_field.value.lower()
+        categoria = self.filtro_categoria.value
+
+        productos_filtrados = [
+            p for p in self.productos
+            if (texto in p["nombre"].lower() or texto in p["descripcion"].lower())
+               and (categoria == "Todas" or p["categoria"] == categoria)
+        ]
+
+        self.productos_grid.controls.clear()
+        for producto in productos_filtrados:
+            self.productos_grid.controls.append(self.crear_card_producto(producto))
+
+        self.page.update()
+
+    def actualizar_grid(self):
+        """Actualiza el grid con todos los productos"""
+        self.productos_grid.controls.clear()
+        for producto in self.productos:
+            self.productos_grid.controls.append(self.crear_card_producto(producto))
+
+    def crear_card_producto(self, producto):
+        """Crea una tarjeta de producto"""
+        card = ft.Container(
+            content=ft.Column([
+                ft.Text(producto["emoji"], size=50),
+                ft.Text(
+                    producto["nombre"],
+                    size=12,
+                    weight="bold",
+                    color="#FF8C00",
+                    max_lines=2,
+                    text_align="center",
+                ),
+                ft.Text(
+                    producto["descripcion"],
+                    size=10,
+                    color="#999999",
+                    max_lines=2,
+                    text_align="center",
+                ),
+                ft.Container(height=8),
+                ft.Text(
+                    f"${producto['precio']}",
+                    size=16,
+                    weight="bold",
+                    color="#FF8C00",
+                ),
+                ft.Container(height=10),
+                ft.ElevatedButton(
+                    "Agregar",
+                    expand=True,
+                    height=35,
+                    bgcolor="#FF8C00",
+                    color="white",
+                    on_click=lambda e, p=producto: self.agregar_carrito(p),
+                ),
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=5),
+            padding=15,
+            bgcolor="#1a1a1a",
+            border_radius=12,
+            border=ft.border.all(1, "#FF8C00"),
+            on_click=lambda e, p=producto: self.ver_detalle(p),
+        )
+
+        return card
+
+    def agregar_carrito(self, producto):
+        """Agrega producto al carrito con cantidad"""
+        producto_id = producto["id"]
+
+        if producto_id in self.carrito:
+            self.carrito[producto_id]["cantidad"] += 1
+        else:
+            self.carrito[producto_id] = {
+                "producto": producto,
+                "cantidad": 1
+            }
+
+        self.guardar_carrito()
+        self.actualizar_contador_carrito()
+
+        snack = ft.SnackBar(
+            ft.Row([
+                ft.Icon(ft.Icons.CHECK_CIRCLE, color="white", size=20),
+                ft.Text(f"✓ {producto['nombre']} agregado", color="white", size=12),
+            ], spacing=10),
+            bgcolor="#4CAF50",
+        )
+        self.page.overlay.append(snack)
+        snack.open = True
+        self.page.update()
+
+    def ver_detalle(self, producto):
+        """Ve detalle del producto"""
+        self.main_content.controls.clear()
+
+        detalle = ft.Container(
+            content=ft.Column([
+                ft.Text("Detalle", size=20, weight="bold", color="#FF8C00"),
+                ft.Container(height=20),
+                ft.Text(producto["emoji"], size=80),
+                ft.Container(height=20),
+                ft.Text(producto["nombre"], size=20, weight="bold", color="#FF8C00"),
+                ft.Text(producto["categoria"], size=12, color="#999999"),
+                ft.Container(height=15),
+                ft.Text(producto["descripcion"], size=13, color="#CCCCCC"),
+                ft.Container(height=20),
+                ft.Text(
+                    f"${producto['precio']}",
+                    size=28,
+                    weight="bold",
+                    color="#FF8C00",
+                ),
+                ft.Container(height=20),
+                ft.ElevatedButton(
+                    "Agregar al Carrito",
+                    expand=True,
+                    height=50,
+                    bgcolor="#FF8C00",
+                    color="white",
+                    on_click=lambda e, p=producto: self.agregar_carrito(p),
+                ),
+                ft.Container(height=20),
+                ft.TextButton(
+                    "← Volver a Tienda",
+                    style=ft.ButtonStyle(color="#FF8C00"),
+                    on_click=self.ir_tienda,
+                ),
+            ], padding=20, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+            bgcolor="#1a1a1a",
+            expand=True,
+        )
+
+        self.main_content.controls = [detalle]
+        self.page.update()
+
+    def ir_carrito(self, e):
+        """Va al carrito con cantidades"""
+        self.main_content.controls.clear()
+
+        if not self.carrito:
+            vacio = ft.Container(
+                content=ft.Column([
+                    ft.Text("Carrito", size=20, weight="bold", color="#FF8C00"),
+                    ft.Container(height=40),
+                    ft.Text("🛒", size=60),
+                    ft.Text("Tu carrito está vacío", size=16, weight="bold", color="#CCCCCC"),
+                    ft.Container(height=20),
+                    ft.ElevatedButton(
+                        "Ir a Tienda",
+                        width=200,
+                        height=45,
+                        bgcolor="#FF8C00",
+                        color="white",
+                        on_click=self.ir_tienda,
+                    ),
+                ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+                padding=20,
+                bgcolor="#1a1a1a",
+                expand=True,
+            )
+            self.main_content.controls = [vacio]
+        else:
+            header = ft.Container(
+                content=ft.Text("Carrito", size=20, weight="bold", color="#FF8C00"),
+                padding=15,
+                bgcolor="#1a1a1a",
+            )
+
+            items_list = ft.Column()
+            total = 0
+
+            for producto_id, item_data in self.carrito.items():
+                producto = item_data["producto"]
+                cantidad = item_data["cantidad"]
+                subtotal = producto["precio"] * cantidad
+                total += subtotal
+
+                item_card = ft.Container(
+                    content=ft.Row([
+                        ft.Text(producto["emoji"], size=30),
+                        ft.Column([
+                            ft.Text(producto["nombre"], size=12, weight="bold", color="#FF8C00"),
+                            ft.Text(f"${producto['precio']} c/u", size=11, color="#999999"),
+                        ], expand=True),
+                        ft.Row([
+                            ft.IconButton(
+                                ft.Icons.REMOVE,
+                                icon_size=16,
+                                icon_color="#FF8C00",
+                                on_click=lambda e, pid=producto_id: self.cambiar_cantidad(pid, -1),
+                            ),
+                            ft.Text(str(cantidad), size=12, weight="bold", color="#FF8C00", width=30),
+                            ft.IconButton(
+                                ft.Icons.ADD,
+                                icon_size=16,
+                                icon_color="#FF8C00",
+                                on_click=lambda e, pid=producto_id: self.cambiar_cantidad(pid, 1),
+                            ),
+                        ], spacing=5),
+                        ft.Text(f"${subtotal:.2f}", size=12, weight="bold", color="#FF8C00", width=60),
+                        ft.IconButton(
+                            ft.Icons.CLOSE,
+                            icon_size=18,
+                            icon_color="#FF6B6B",
+                            on_click=lambda e, pid=producto_id: self.eliminar_carrito(pid),
+                        ),
+                    ], spacing=10),
+                    padding=12,
+                    bgcolor="#2a2a2a",
+                    border_radius=10,
+                    border=ft.border.all(1, "#FF8C00"),
+                    margin=ft.margin.symmetric(horizontal=15, vertical=5),
+                )
+                items_list.controls.append(item_card)
+
+            resumen = ft.Container(
+                content=ft.Column([
+                    ft.Row([
+                        ft.Text("Subtotal:", weight="bold", size=12, color="#CCCCCC"),
+                        ft.Text(f"${total:.2f}", weight="bold", size=12, color="#FF8C00"),
+                    ]),
+                    ft.Row([
+                        ft.Text("Envío:", weight="bold", size=12, color="#CCCCCC"),
+                        ft.Text("Gratis", color="#4CAF50", weight="bold", size=12),
+                    ]),
+                    ft.Divider(height=10, color="#333333"),
+                    ft.Row([
+                        ft.Text("Total:", size=14, weight="bold", color="#FF8C00"),
+                        ft.Text(f"${total:.2f}", size=16, weight="bold", color="#FF8C00"),
+                    ]),
+                ], spacing=8),
+                padding=15,
+                bgcolor="#2a2a2a",
+                border_radius=10,
+                border=ft.border.all(1, "#FF8C00"),
+                margin=ft.margin.symmetric(horizontal=15, vertical=15),
+            )
+
+            boton_comprar = ft.Container(
+                content=ft.ElevatedButton(
+                    "Proceder al Pago",
+                    expand=True,
+                    height=50,
+                    bgcolor="#FF8C00",
+                    color="white",
+                    on_click=self.proceder_pago,
+                ),
+                alignment=ft.alignment.center,
+                padding=15,
+                margin=ft.margin.symmetric(horizontal=15),
+            )
+
+            self.main_content.controls = [
+                header,
+                ft.Divider(height=1, color="#333333"),
+                ft.Container(
+                    content=ft.Text("Productos", size=12, weight="bold", color="#999999"),
+                    padding=ft.padding.symmetric(horizontal=15),
+                ),
+                items_list,
+                resumen,
+                boton_comprar,
+                ft.Container(height=20, bgcolor="#0d0d0d"),
+            ]
+
+        self.page.update()
+
+    def cambiar_cantidad(self, producto_id, cambio):
+        """Cambia la cantidad de un producto en el carrito"""
+        if producto_id in self.carrito:
+            nueva_cantidad = self.carrito[producto_id]["cantidad"] + cambio
+            if nueva_cantidad > 0:
+                self.carrito[producto_id]["cantidad"] = nueva_cantidad
+            else:
+                del self.carrito[producto_id]
+            self.guardar_carrito()
+            self.actualizar_contador_carrito()
+            self.ir_carrito(None)
+
+    def eliminar_carrito(self, producto_id):
+        """Elimina producto del carrito"""
+        if producto_id in self.carrito:
+            del self.carrito[producto_id]
+            self.guardar_carrito()
+            self.actualizar_contador_carrito()
+            self.ir_carrito(None)
+
+    def proceder_pago(self, e):
+        """Procede al pago"""
+        self.mostrar_snackbar("Redirigiendo a pasarela de pago...", "#FF8C00")
+
+    def ir_instrucciones(self, e):
+        """Va a instrucciones"""
+        self.main_content.controls.clear()
+
+        contenido = ft.Container(
+            content=ft.Column([
+                ft.Text("Instrucciones", size=20, weight="bold", color="#FF8C00"),
+                ft.Container(height=20),
+                ft.Text("📖", size=60),
+                ft.Text("Guía de Uso", size=18, weight="bold", color="#FF8C00"),
+                ft.Container(height=20),
+                ft.Text("Instrucciones de cultivo y preparación", size=12, color="#999999"),
+                ft.Container(height=40),
+                ft.Column([
+                    ft.Text("1. Preparación del Sustrato", size=14, weight="bold", color="#FF8C00"),
+                    ft.Text("Mezcla el sustrato con los hongos en proporción 1:10", size=11, color="#CCCCCC"),
+                    ft.Container(height=15),
+                    ft.Text("2. Incubación", size=14, weight="bold", color="#FF8C00"),
+                    ft.Text("Mantén a temperatura de 20-25°C durante 3-4 semanas", size=11, color="#CCCCCC"),
+                    ft.Container(height=15),
+                    ft.Text("3. Fructificación", size=14, weight="bold", color="#FF8C00"),
+                    ft.Text("Aumenta la humedad al 85-95% y reduce la temperatura", size=11, color="#CCCCCC"),
+                ], spacing=5),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+            padding=20,
+            bgcolor="#1a1a1a",
+            expand=True,
+        )
+
+        self.main_content.controls = [contenido]
+        self.page.update()
+
+    def ir_blog(self, e):
+        """Va a blog"""
+        self.main_content.controls.clear()
+
+        contenido = ft.Container(
+            content=ft.Column([
+                ft.Text("Blog", size=20, weight="bold", color="#FF8C00"),
+                ft.Container(height=20),
+                ft.Text("📝", size=60),
+                ft.Container(height=20),
+                ft.Column([
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text("Beneficios de los Hongos Medicinales", size=14, weight="bold",
+                                    color="#FF8C00"),
+                            ft.Text("Descubre cómo los hongos pueden mejorar tu salud", size=11, color="#CCCCCC"),
+                            ft.Container(height=10),
+                            ft.Text(
+                                "Los hongos medicinales han sido utilizados durante miles de años en la medicina tradicional china...",
+                                size=10, color="#999999"),
+                        ], spacing=5),
+                        padding=15,
+                        bgcolor="#2a2a2a",
+                        border_radius=10,
+                        border=ft.border.all(1, "#FF8C00"),
+                        margin=ft.margin.symmetric(horizontal=15, vertical=10),
+                    ),
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text("Guía de Cultivo en Casa", size=14, weight="bold", color="#FF8C00"),
+                            ft.Text("Aprende a cultivar hongos frescos en tu hogar", size=11, color="#CCCCCC"),
+                            ft.Container(height=10),
+                            ft.Text(
+                                "Cultivar hongos en casa es más fácil de lo que crees. Con nuestro kit completo...",
+                                size=10, color="#999999"),
+                        ], spacing=5),
+                        padding=15,
+                        bgcolor="#2a2a2a",
+                        border_radius=10,
+                        border=ft.border.all(1, "#FF8C00"),
+                        margin=ft.margin.symmetric(horizontal=15, vertical=10),
+                    ),
+                ], spacing=5),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
+            padding=20,
+            bgcolor="#1a1a1a",
+            expand=True,
+        )
+
+        self.main_content.controls = [contenido]
+        self.page.update()
+
+    def guardar_carrito(self):
+        """Guarda el carrito en un archivo JSON"""
+        carrito_data = {}
+        for pid, item in self.carrito.items():
+            carrito_data[str(pid)] = {
+                "cantidad": item["cantidad"],
+                "precio": item["producto"]["precio"]
+            }
+
+        try:
+            with open("carrito.json", "w") as f:
+                json.dump(carrito_data, f)
+        except Exception as e:
+            print(f"Error al guardar carrito: {e}")
+
+    def cargar_carrito(self):
+        """Carga el carrito desde JSON"""
+        try:
+            with open("carrito.json", "r") as f:
+                carrito_data = json.load(f)
+                for pid_str, item_data in carrito_data.items():
+                    pid = int(pid_str)
+                    producto = next((p for p in self.productos if p["id"] == pid), None)
+                    if producto:
+                        self.carrito[pid] = {
+                            "producto": producto,
+                            "cantidad": item_data["cantidad"]
+                        }
+        except FileNotFoundError:
+            pass
+        except Exception as e:
+            print(f"Error al cargar carrito: {e}")
+
+    def actualizar_contador_carrito(self):
+        """Actualiza el contador del carrito en el AppBar"""
+        total_items = sum(item["cantidad"] for item in self.carrito.values())
+
+        self.carrito_badge.content.value = str(total_items) if total_items > 0 else ""
+        self.page.update()
+
+    def validar_email(self, email):
+        """Valida formato de email"""
+        patron = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+        return re.match(patron, email) is not None
+
+    def suscribirse_newsletter(self, e):
+        """Maneja la suscripción al newsletter"""
+        email = self.newsletter_email.value
+
+        if not email:
+            self.mostrar_snackbar("Por favor ingresa un email", "#FF6B6B")
+            return
+
+        if not self.validar_email(email):
+            self.mostrar_snackbar("Email inválido", "#FF6B6B")
+            return
+
+        self.mostrar_snackbar(f"¡Suscrito! Confirmación enviada a {email}", "#4CAF50")
+        self.newsletter_email.value = ""
+        self.page.update()
+
+    def mostrar_snackbar(self, mensaje, color):
+        """Muestra un snackbar con mensaje"""
+        snack = ft.SnackBar(
+            ft.Row([
+                ft.Icon(ft.Icons.INFO, color="white", size=20),
+                ft.Text(mensaje, color="white", size=12),
+            ], spacing=10),
+            bgcolor=color,
+        )
+        self.page.overlay.append(snack)
+        snack.open = True
+        self.page.update()
+
+    def on_resized(self, e):
+        """Maneja el redimensionamiento de la ventana"""
+        ancho = self.page.window.width
+
+        if ancho < 600:
+            runs_count = 1
+        elif ancho < 900:
+            runs_count = 2
+        elif ancho < 1200:
+            runs_count = 3
+        else:
+            runs_count = 4
+
+        if hasattr(self, 'productos_grid'):
+            self.productos_grid.runs_count = runs_count
+            self.page.update()
+
+
+def main(page: ft.Page):
+    app = MicelioApp(page)
+
+
+if __name__ == "__main__":
+    ft.app(target=main)
+   ## if __name__ == "__main__":
+     ##   ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8080)

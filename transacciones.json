@@ -1,0 +1,53 @@
+[
+  {
+    "referencia": "FH-20260509225540",
+    "cliente": "khjkj",
+    "numero": "3218870869",
+    "monto": 135.0,
+    "fecha": "09/05/2026 22:55:40",
+    "estado": "Pendiente",
+    "items": [
+      {
+        "nombre": "Kit Cultivo Ostra",
+        "cantidad": 1,
+        "precio": 45000
+      },
+      {
+        "nombre": "Sustrato Premium",
+        "cantidad": 1,
+        "precio": 30000
+      },
+      {
+        "nombre": "Spray Humidificador",
+        "cantidad": 1,
+        "precio": 25000
+      }
+    ]
+  },
+  {
+    "referencia": "FH-20260510000242",
+    "cliente": "khjkj",
+    "numero": "3218870869",
+    "monto": 135.0,
+    "fecha": "10/05/2026 00:02:43",
+    "estado": "Confirmado",
+    "items": [
+      {
+        "nombre": "Kit Cultivo Ostra",
+        "cantidad": 1,
+        "precio": 45000
+      },
+      {
+        "nombre": "Sustrato Premium",
+        "cantidad": 1,
+        "precio": 30000
+      },
+      {
+        "nombre": "Spray Humidificador",
+        "cantidad": 1,
+        "precio": 25000
+      }
+    ],
+    "fecha_confirmacion": "10/05/2026 00:03:17"
+  }
+]
