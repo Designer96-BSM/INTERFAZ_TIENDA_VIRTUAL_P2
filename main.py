@@ -1,10 +1,12 @@
 # main.py
 import flet as ft
-import webbrowser
+import time
 from config import (
     PRIMARY_COLOR, SECONDARY_COLOR, SUCCESS_COLOR, BG_DARK, BG_CARD,
     BG_INPUT, TEXT_PRIMARY, TEXT_SECONDARY, TEXT_ACCENT, BORDER_COLOR,
-    PRODUCTOS, NUMERO_NEQUI
+    PRODUCTOS, NUMERO_NEQUI, DELAY_SNACKBAR, DELAY_WHATSAPP,
+    ESPACIO_CONTENEDOR, ESPACIO_PEQUEÑO, GRID_CHILD_ASPECT_RATIO,
+    TIMEOUT_WHATSAPP
 )
 from logic import CarritoManager, ProductoManager, ValidadorEmail, WhatsAppManager
 from views import (
@@ -14,29 +16,38 @@ from views import (
 
 
 class FungiHouseApp:
+    """
+    Aplicación principal de FungiHouse - E-commerce de hongos.
+    Gestiona navegación, carrito, pagos y UI.
+    """
+
     def __init__(self, page: ft.Page):
         self.page = page
-        self.page.title = "FungiHouse - Sabores Ancestrales"
+        self.page.title = "FungiHouse"
         self.page.window.maximized = True
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.on_resized = self.on_resized
 
-        # Managers
+        # ============ MANAGERS ============
         self.carrito_manager = CarritoManager()
         self.producto_manager = ProductoManager()
         self.validador = ValidadorEmail()
         self.whatsapp_manager = WhatsAppManager()
 
-        # Número WhatsApp desde config
+        # ============ CONFIGURACIÓN ============
         self.numero_whatsapp = NUMERO_NEQUI
+        self.dialogo_abierto = False  # Bandera para evitar diálogos duplicados
 
-        # UI Components
+        # ============ UI COMPONENTS ============
         self.carrito_badge = HeaderView.crear_carrito_badge()
         self.main_content = ft.Column(expand=True, scroll="auto")
         self.newsletter_email = None
         self.productos_grid = None
         self.search_field = None
         self.filtro_categoria = None
+
+        # ============ CACHE ============
+        self.categorias_cache = None
 
         self.setup_ui()
         self.actualizar_contador_carrito()
@@ -58,8 +69,10 @@ class FungiHouseApp:
             )
         )
 
+    # ============ NAVEGACIÓN ============
+
     def mostrar_inicio(self):
-        """Pantalla principal"""
+        """Pantalla principal - Hero, beneficios, testimonios, newsletter"""
         self.main_content.controls.clear()
 
         hero = InicioView.crear_hero(self.ir_tienda)
@@ -74,29 +87,29 @@ class FungiHouseApp:
             hero,
             ft.Container(
                 content=ft.Text("¿POR QUÉ ELEGIRNOS?", size=14, weight="bold", color=PRIMARY_COLOR),
-                padding=ft.padding.symmetric(horizontal=20, vertical=20),
+                padding=ft.padding.symmetric(horizontal=ESPACIO_PEQUEÑO, vertical=ESPACIO_CONTENEDOR),
                 bgcolor=BG_DARK,
             ),
             beneficios,
-            ft.Container(height=20, bgcolor=BG_DARK),
+            ft.Container(height=ESPACIO_CONTENEDOR, bgcolor=BG_DARK),
             ft.Container(
                 content=ft.Text("TESTIMONIOS", size=14, weight="bold", color=PRIMARY_COLOR),
-                padding=ft.padding.symmetric(horizontal=20, vertical=20),
+                padding=ft.padding.symmetric(horizontal=ESPACIO_PEQUEÑO, vertical=ESPACIO_CONTENEDOR),
                 bgcolor=BG_DARK,
             ),
             testimonios,
-            ft.Container(height=20, bgcolor=BG_DARK),
+            ft.Container(height=ESPACIO_CONTENEDOR, bgcolor=BG_DARK),
             newsletter,
             footer,
         ]
         self.page.update()
 
     def ir_inicio(self, e):
-        """Va a inicio"""
+        """Navega a inicio"""
         self.mostrar_inicio()
 
     def ir_tienda(self, e):
-        """Va a tienda con productos"""
+        """Navega a tienda con filtros de búsqueda y categoría"""
         self.main_content.controls.clear()
 
         self.search_field = ft.TextField(
@@ -109,11 +122,14 @@ class FungiHouseApp:
             on_change=self.filtrar_productos,
         )
 
-        categorias = self.producto_manager.obtener_categorias()
+        # MEJORA 7: Cachear categorías
+        if not self.categorias_cache:
+            self.categorias_cache = self.producto_manager.obtener_categorias()
+
         self.filtro_categoria = ft.Dropdown(
             label="Categoría",
             options=[ft.dropdown.Option("Todas")] +
-                    [ft.dropdown.Option(cat) for cat in categorias],
+                    [ft.dropdown.Option(cat) for cat in self.categorias_cache],
             bgcolor=BG_INPUT,
             border_color=PRIMARY_COLOR,
             color=TEXT_PRIMARY,
@@ -132,7 +148,7 @@ class FungiHouseApp:
                     self.filtro_categoria,
                 ], spacing=10),
             ]),
-            padding=15,
+            padding=ESPACIO_PEQUEÑO,
             bgcolor=BG_CARD,
         )
 
@@ -143,8 +159,8 @@ class FungiHouseApp:
             runs_count=runs_count,
             spacing=12,
             run_spacing=12,
-            child_aspect_ratio=0.75,
-            padding=ft.padding.symmetric(horizontal=15),
+            child_aspect_ratio=GRID_CHILD_ASPECT_RATIO,
+            padding=ft.padding.symmetric(horizontal=ESPACIO_PEQUEÑO),
             expand=True,
         )
 
@@ -154,26 +170,45 @@ class FungiHouseApp:
             header,
             ft.Divider(height=1, color=BORDER_COLOR),
             self.productos_grid,
-            ft.Container(height=20, bgcolor=BG_DARK),
+            ft.Container(height=ESPACIO_CONTENEDOR, bgcolor=BG_DARK),
         ]
         self.page.update()
 
     def filtrar_productos(self, e):
-        """Filtra productos según búsqueda y categoría"""
+        """
+        Filtra productos según búsqueda y categoría.
+        MEJORA 6: Feedback visual cuando no hay resultados
+        """
         texto = self.search_field.value.lower()
         categoria = self.filtro_categoria.value
 
         productos_filtrados = self.producto_manager.filtrar(texto, categoria)
 
         self.productos_grid.controls.clear()
-        for producto in productos_filtrados:
+
+        # MEJORA 6: Mostrar mensaje si no hay resultados
+        if not productos_filtrados:
             self.productos_grid.controls.append(
-                ProductoView.crear_card_producto(
-                    producto,
-                    lambda e, p=producto: self.agregar_carrito(p),
-                    lambda e, p=producto: self.ver_detalle(p),
+                ft.Container(
+                    content=ft.Text(
+                        "No hay productos que coincidan con tu búsqueda",
+                        color=TEXT_SECONDARY,
+                        size=14,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    alignment=ft.alignment.center,
+                    padding=ESPACIO_CONTENEDOR,
                 )
             )
+        else:
+            for producto in productos_filtrados:
+                self.productos_grid.controls.append(
+                    ProductoView.crear_card_producto(
+                        producto,
+                        lambda e, p=producto: self.agregar_carrito(p),
+                        lambda e, p=producto: self.ver_detalle(p),
+                    )
+                )
 
         self.page.update()
 
@@ -190,7 +225,9 @@ class FungiHouseApp:
             )
 
     def agregar_carrito(self, producto):
-        """Agrega producto al carrito"""
+        """
+        Agrega producto al carrito y muestra feedback visual.
+        """
         self.carrito_manager.agregar(producto)
         self.actualizar_contador_carrito()
 
@@ -206,7 +243,7 @@ class FungiHouseApp:
         self.page.update()
 
     def ver_detalle(self, producto):
-        """Ve detalle del producto"""
+        """Ve el detalle completo de un producto"""
         self.main_content.controls.clear()
         detalle = ProductoView.crear_detalle_producto(
             producto,
@@ -217,7 +254,7 @@ class FungiHouseApp:
         self.page.update()
 
     def ir_carrito(self, e):
-        """Va al carrito"""
+        """Navega a la vista del carrito"""
         self.main_content.controls.clear()
 
         if not self.carrito_manager.carrito:
@@ -238,7 +275,7 @@ class FungiHouseApp:
                     ),
                 ], alignment=ft.MainAxisAlignment.CENTER,
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=0),
-                padding=20,
+                padding=ESPACIO_PEQUEÑO,
                 bgcolor=BG_CARD,
                 expand=True,
             )
@@ -246,7 +283,7 @@ class FungiHouseApp:
         else:
             header = ft.Container(
                 content=ft.Text("Carrito", size=20, weight="bold", color=PRIMARY_COLOR),
-                padding=15,
+                padding=ESPACIO_PEQUEÑO,
                 bgcolor=BG_CARD,
             )
 
@@ -268,18 +305,22 @@ class FungiHouseApp:
 
             resumen = CarritoView.crear_resumen_carrito(total)
 
+            # MEJORA 5: Botón que pide confirmación antes de enviar
+            # ✅ DESPUÉS - Con icono y color verde
             boton_comprar = ft.Container(
                 content=ft.ElevatedButton(
-                    "Enviar Pedido por WhatsApp",
+                    "Enviar por WhatsApp",
                     expand=True,
                     height=50,
-                    bgcolor=PRIMARY_COLOR,
+                    bgcolor="#25D366",  # Color oficial WhatsApp
                     color=TEXT_PRIMARY,
-                    on_click=self.enviar_whatsapp,
+                    icon=ft.Icons.SEND,
+                    icon_color=TEXT_PRIMARY,
+                    on_click=self.confirmar_envio_pedido,
                 ),
                 alignment=ft.alignment.center,
-                padding=15,
-                margin=ft.margin.symmetric(horizontal=15),
+                padding=ESPACIO_PEQUEÑO,
+                margin=ft.margin.symmetric(horizontal=ESPACIO_PEQUEÑO),
             )
 
             self.main_content.controls = [
@@ -287,30 +328,107 @@ class FungiHouseApp:
                 ft.Divider(height=1, color=BORDER_COLOR),
                 ft.Container(
                     content=ft.Text("Productos", size=12, weight="bold", color=TEXT_SECONDARY),
-                    padding=ft.padding.symmetric(horizontal=15),
+                    padding=ft.padding.symmetric(horizontal=ESPACIO_PEQUEÑO),
                 ),
                 items_list,
                 resumen,
                 boton_comprar,
-                ft.Container(height=20, bgcolor=BG_DARK),
+                ft.Container(height=ESPACIO_CONTENEDOR, bgcolor=BG_DARK),
             ]
 
         self.page.update()
 
     def cambiar_cantidad(self, producto_id, cambio):
-        """Cambia la cantidad de un producto"""
+        """
+        Cambia la cantidad de un producto en el carrito.
+
+        Args:
+            producto_id (str): ID del producto
+            cambio (int): Incremento/decremento (-1, +1)
+        """
         self.carrito_manager.cambiar_cantidad(producto_id, cambio)
         self.actualizar_contador_carrito()
         self.ir_carrito(None)
 
     def eliminar_carrito(self, producto_id):
-        """Elimina producto del carrito"""
+        """
+        Elimina un producto del carrito.
+
+        Args:
+            producto_id (str): ID del producto a eliminar
+        """
         self.carrito_manager.eliminar(producto_id)
         self.actualizar_contador_carrito()
         self.ir_carrito(None)
 
+    # ============ PAGOS Y CONFIRMACIÓN ============
+
+    def confirmar_envio_pedido(self, e):
+        """
+        MEJORA 5: Pide confirmación antes de enviar el pedido.
+        Muestra total y opciones de confirmar/cancelar.
+        """
+        if self.dialogo_abierto:
+            return
+
+        total = self.carrito_manager.obtener_total()
+
+        dlg = ft.AlertDialog(
+            title=ft.Text("Confirmar Pedido", size=18, weight="bold"),
+            content=ft.Column([
+                ft.Text(f"Total: ${total:,.0f}", size=16, color=PRIMARY_COLOR, weight="bold"),
+                ft.Container(height=10),
+                ft.Text("¿Deseas continuar con el envío?", size=12, color=TEXT_SECONDARY),
+            ], spacing=10),
+            actions=[
+                ft.TextButton("Cancelar", on_click=self.cerrar_dialogo),
+                ft.TextButton(
+                    "Enviar",
+                    on_click=self.enviar_whatsapp,
+                    style=ft.ButtonStyle(color=SUCCESS_COLOR),
+                ),
+            ],
+        )
+
+        self.page.dialog = dlg
+        dlg.open = True
+        self.dialogo_abierto = True
+        self.page.update()
+
+    def cerrar_dialogo(self, e=None):
+        """Cierra el diálogo actual"""
+        if self.page.dialog:
+            self.page.dialog.open = False
+            self.dialogo_abierto = False
+            self.page.update()
+
     def enviar_whatsapp(self, e):
-        """Envía el pedido por WhatsApp - Híbrido con 3 planes"""
+        """
+        Envía el pedido por WhatsApp con manejo robusto de errores.
+        MEJORA 1: Valida antes de enviar
+        MEJORA 2: Manejo de errores mejorado
+        MEJORA 4: Indicador de carga
+        """
+        self.cerrar_dialogo()
+
+        # MEJORA 1: Validar carrito antes de enviar
+        if not self.validar_carrito_antes_envio():
+            return
+
+        # MEJORA 4: Mostrar diálogo de carga
+        dlg_carga = ft.AlertDialog(
+            title=ft.Text("Abriendo WhatsApp..."),
+            content=ft.Column([
+                ft.ProgressRing(width=50, height=50),
+                ft.Container(height=10),
+                ft.Text("Por favor espera", size=12, color=TEXT_SECONDARY, text_align=ft.TextAlign.CENTER),
+            ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+        )
+
+        self.page.dialog = dlg_carga
+        dlg_carga.open = True
+        self.page.update()
+
         try:
             total = self.carrito_manager.obtener_total()
 
@@ -332,7 +450,6 @@ class FungiHouseApp:
             import platform
             import subprocess
             import webbrowser
-            import time
 
             sistema = platform.system()
             app_abierta = False
@@ -375,7 +492,7 @@ class FungiHouseApp:
             if not app_abierta:
                 print("[DEBUG] Abriendo Plan C: WhatsApp Web")
                 webbrowser.open(url_whatsapp)
-                time.sleep(1)
+                time.sleep(DELAY_WHATSAPP)
                 self.mostrar_snackbar(
                     "✓ Abriendo WhatsApp Web en el navegador",
                     SUCCESS_COLOR
@@ -386,34 +503,68 @@ class FungiHouseApp:
                     SUCCESS_COLOR
                 )
 
-            # Limpiar carrito
+            # MEJORA 2: Solo limpiar carrito si todo va bien
             self.carrito_manager.limpiar()
             self.actualizar_contador_carrito()
 
-            # Volver a inicio
-            time.sleep(2)
+            # Cerrar diálogo de carga
+            dlg_carga.open = False
+            self.page.update()
+
+            # Volver a inicio después de un tiempo
+            time.sleep(DELAY_SNACKBAR)
             self.mostrar_inicio()
 
         except Exception as error:
             print(f"[DEBUG] Error general: {error}")
-            self.mostrar_snackbar(f"❌ Error: {str(error)}", SECONDARY_COLOR)
+
+            # MEJORA 2: Cerrar diálogo de carga y mostrar error
+            dlg_carga.open = False
+            self.page.update()
+
+            self.mostrar_snackbar(
+                f"❌ Error: {str(error)}",
+                SECONDARY_COLOR
+            )
+
+    def validar_carrito_antes_envio(self) -> bool:
+        """
+        MEJORA 1: Valida que el carrito sea enviable.
+
+        Returns:
+            bool: True si es válido, False si hay problemas
+        """
+        if not self.carrito_manager.carrito:
+            self.mostrar_snackbar("Carrito vacío", SECONDARY_COLOR)
+            return False
+
+        total = self.carrito_manager.obtener_total()
+        if total <= 0:
+            self.mostrar_snackbar("Total inválido", SECONDARY_COLOR)
+            return False
+
+        return True
+
+    # ============ OTRAS SECCIONES ============
 
     def ir_instrucciones(self, e):
-        """Va a instrucciones"""
+        """Navega a instrucciones"""
         self.main_content.controls.clear()
         contenido = InformativasView.crear_instrucciones(self.ir_inicio)
         self.main_content.controls = [contenido]
         self.page.update()
 
     def ir_blog(self, e):
-        """Va a blog"""
+        """Navega a blog"""
         self.main_content.controls.clear()
         contenido = InformativasView.crear_blog(self.ir_inicio)
         self.main_content.controls = [contenido]
         self.page.update()
 
     def suscribirse_newsletter(self, e):
-        """Maneja la suscripción al newsletter"""
+        """
+        Maneja la suscripción al newsletter con validación.
+        """
         email = self.newsletter_email.value
 
         if not email:
@@ -424,19 +575,35 @@ class FungiHouseApp:
             self.mostrar_snackbar("Email inválido", SECONDARY_COLOR)
             return
 
-        self.mostrar_snackbar(f"¡Suscrito! Confirmación enviada a {email}", SUCCESS_COLOR)
+        self.mostrar_snackbar(
+            f"¡Suscrito! Confirmación enviada a {email}",
+            SUCCESS_COLOR
+        )
         self.newsletter_email.value = ""
         self.page.update()
 
-    def actualizar_contador_carrito(self):
-        """Actualiza el contador del carrito en el AppBar"""
-        total_items = self.carrito_manager.obtener_cantidad_items()
+    # ============ UI UTILITIES ============
 
-        self.carrito_badge.content.value = str(total_items) if total_items > 0 else ""
-        self.page.update()
+    def actualizar_contador_carrito(self):
+        """
+        Actualiza el contador del carrito en el AppBar.
+        MEJORA 3: Manejo más robusto
+        """
+        try:
+            total_items = self.carrito_manager.obtener_cantidad_items()
+            self.carrito_badge.content.value = str(total_items) if total_items > 0 else ""
+            self.page.update()
+        except Exception as error:
+            print(f"[DEBUG] Error al actualizar contador: {error}")
 
     def mostrar_snackbar(self, mensaje, color):
-        """Muestra un snackbar con mensaje"""
+        """
+        Muestra un snackbar con mensaje y color.
+
+        Args:
+            mensaje (str): Texto a mostrar
+            color (str): Color de fondo (hex)
+        """
         snack = ft.SnackBar(
             ft.Row([
                 ft.Icon(ft.Icons.INFO, color=TEXT_PRIMARY, size=20),
@@ -449,20 +616,30 @@ class FungiHouseApp:
         self.page.update()
 
     def on_resized(self, e):
-        """Maneja el redimensionamiento de la ventana"""
-        ancho = self.page.window.width
-        runs_count = ResponsiveView.calcular_columnas(ancho)
+        """
+        Maneja el redimensionamiento de la ventana.
+        MEJORA 3: Validación más robusta
+        """
+        try:
+            ancho = self.page.window.width
+            runs_count = ResponsiveView.calcular_columnas(ancho)
 
-        if hasattr(self, 'productos_grid') and self.productos_grid:
-            self.productos_grid.runs_count = runs_count
-            self.page.update()
+            if (self.productos_grid and
+                    hasattr(self.productos_grid, 'runs_count')):
+                self.productos_grid.runs_count = runs_count
+                self.page.update()
+        except Exception as error:
+            print(f"[DEBUG] Error en on_resized: {error}")
 
 
 def main(page: ft.Page):
+    """Punto de entrada de la aplicación"""
     app = FungiHouseApp(page)
 
 
 if __name__ == "__main__":
-    #ft.app(target=main)
+    # Para ejecutar en escritorio:
+     ft.app(target=main)
+
     # Para ejecutar en web:
-     ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8000)
+    #ft.app(target=main, view=ft.AppView.WEB_BROWSER, port=8000)

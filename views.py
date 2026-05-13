@@ -30,29 +30,37 @@ class HeaderView:
     @staticmethod
     def crear_appbar(on_ir_inicio, on_ir_tienda, on_ir_instrucciones,
                      on_ir_blog, on_ir_carrito, carrito_badge):
-        """Crea el AppBar principal"""
+        """Crea el AppBar principal con iconos + texto en botones"""
         nav_buttons = ft.Row([
             ft.TextButton(
-                "Inicio",
-                style=ft.ButtonStyle(color="gray"),
+                content=ft.Row([
+                    ft.Icon(ft.Icons.HOME, size=18, color=PRIMARY_COLOR),
+                    ft.Text("Inicio", size=12, color=PRIMARY_COLOR),
+                ], spacing=5),
                 on_click=on_ir_inicio,
             ),
             ft.TextButton(
-                "Tienda",
-                style=ft.ButtonStyle(color="gray"),
+                content=ft.Row([
+                    ft.Icon(ft.Icons.SHOPPING_BAG, size=18, color=PRIMARY_COLOR),
+                    ft.Text("Tienda", size=12, color=PRIMARY_COLOR),
+                ], spacing=5),
                 on_click=on_ir_tienda,
             ),
             ft.TextButton(
-                "Instrucciones",
-                style=ft.ButtonStyle(color="gray"),
+                content=ft.Row([
+                    ft.Icon(ft.Icons.HELP, size=18, color=PRIMARY_COLOR),
+                    ft.Text("Instrucciones", size=12, color=PRIMARY_COLOR),
+                ], spacing=5),
                 on_click=on_ir_instrucciones,
             ),
             ft.TextButton(
-                "Blog",
-                style=ft.ButtonStyle(color="gray"),
+                content=ft.Row([
+                    ft.Icon(ft.Icons.ARTICLE, size=18, color=PRIMARY_COLOR),
+                    ft.Text("Blog", size=12, color=PRIMARY_COLOR),
+                ], spacing=5),
                 on_click=on_ir_blog,
             ),
-        ], spacing=110, scale=1.2)
+        ], spacing=15, scale=1.0)
 
         logo_path = get_logo_path()
         titulo_path = get_titulo_path()

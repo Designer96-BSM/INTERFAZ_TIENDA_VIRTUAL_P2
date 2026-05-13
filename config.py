@@ -86,6 +86,16 @@ TEXT_ACCENT = COLORES["text_accent"]
 BORDER_COLOR = COLORES["border"]
 
 # ============================================
+# CONSTANTES DE COMPORTAMIENTO (NUEVAS)
+# ============================================
+DELAY_SNACKBAR = 2  # segundos
+DELAY_WHATSAPP = 1  # segundos
+ESPACIO_CONTENEDOR = 20  # píxeles
+ESPACIO_PEQUEÑO = 15  # píxeles
+GRID_CHILD_ASPECT_RATIO = 0.75
+TIMEOUT_WHATSAPP = 5  # segundos antes de timeout
+
+# ============================================
 # RUTAS
 # ============================================
 def get_logo_path():
